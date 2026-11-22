@@ -248,12 +248,16 @@ def column_positions(margin, width, count, gap):
     return col_w, [margin + i * (col_w + gap) for i in range(count)]
 
 
-def story_block(rows, x, y, w, tag, headline, detail, tag_scale=2, head_scale=3, detail_scale=2, gap=12):
+def story_block(rows, x, y, w, tag, headline, detail, tag_scale=2, head_scale=3, detail_scale=2,
+                gap=12, headline_line_gap=8, headline_gap=6, detail_line_gap=6):
+    """A tagged headline + detail, the shape shared by every story on the page
+    (the lead story at a bigger scale and its own spacing, and each of the
+    six grid stories at a smaller one)."""
     _, th = draw_tag(rows, x, y, tag, tag_scale)
     y += th + gap
-    y = flow_text(rows, x, y, headline, INK, head_scale, w, 8)
-    y += 6
-    return flow_text(rows, x, y, detail, MUTED, detail_scale, w, 6)
+    y = flow_text(rows, x, y, headline, INK, head_scale, w, headline_line_gap)
+    y += headline_gap
+    return flow_text(rows, x, y, detail, MUTED, detail_scale, w, detail_line_gap)
 
 
 def build():
@@ -276,15 +280,15 @@ def build():
 
     y = 212
 
-    # main headline
-    draw_tag(rows, margin, y, "SOUTH CHINA SEA", 3)
-    y += 56
-    y = flow_text(rows, margin, y, "CHINESE BOMBER'S FEINT TOWARD MANILA STOKES MISSILE FEARS",
-                  INK, 4, content_w, 10)
-    y += 8
-    y = flow_text(rows, margin, y,
-                  "H-6 BOMBER CAPABLE OF CARRYING CRUISE MISSILES TURNS BACK 170KM FROM THE CAPITAL NEAR A DISPUTED SHOAL",
-                  MUTED, 3, content_w, 8)
+    # lead story, at a bigger scale than the six in the grid below
+    y = story_block(
+        rows, margin, y, content_w,
+        "SOUTH CHINA SEA",
+        "CHINESE BOMBER'S FEINT TOWARD MANILA STOKES MISSILE FEARS",
+        "H-6 BOMBER CAPABLE OF CARRYING CRUISE MISSILES TURNS BACK 170KM FROM THE CAPITAL NEAR A DISPUTED SHOAL",
+        tag_scale=3, head_scale=4, detail_scale=3, gap=28,
+        headline_line_gap=10, headline_gap=8, detail_line_gap=8,
+    )
 
     y += 22
     hline(rows, margin, y, content_w, RULE, 2)
