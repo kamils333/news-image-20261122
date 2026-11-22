@@ -232,17 +232,31 @@ def draw_tag(rows, x, y, label, scale=2):
     return w, h
 
 
+def flow_text(rows, x, y, text, color, scale, max_width, line_gap, spacing=1):
+    """Wraps text to max_width and draws it top-down; returns the y just past the last line.
+
+    Pulled out because the page had four copies of this wrap-then-advance loop
+    (main headline, its subhead, a story's headline and detail) that only
+    differed in color/scale/gap, drifting out of sync whenever one was tuned.
+    """
+    for line in wrap_text(text, scale, max_width, spacing):
+        draw_text(rows, x, y, line, color, scale, spacing)
+        y += GLYPH_H * scale + line_gap
+    return y
+
+
+def column_positions(margin, width, count, gap):
+    """count equal-width columns spanning margin..width-margin, gap apart."""
+    col_w = (width - margin * 2 - gap * (count - 1)) // count
+    return col_w, [margin + i * (col_w + gap) for i in range(count)]
+
+
 def story_block(rows, x, y, w, tag, headline, detail, tag_scale=2, head_scale=3, detail_scale=2, gap=12):
     _, th = draw_tag(rows, x, y, tag, tag_scale)
     y += th + gap
-    for line in wrap_text(headline, head_scale, w):
-        draw_text(rows, x, y, line, INK, head_scale)
-        y += GLYPH_H * head_scale + 8
+    y = flow_text(rows, x, y, headline, INK, head_scale, w, 8)
     y += 6
-    for line in wrap_text(detail, detail_scale, w):
-        draw_text(rows, x, y, line, MUTED, detail_scale)
-        y += GLYPH_H * detail_scale + 6
-    return y
+    return flow_text(rows, x, y, detail, MUTED, detail_scale, w, 6)
 
 
 def build():
@@ -255,36 +269,31 @@ def build():
     fill_rect(rows, WIDTH - 10, 0, 10, HEIGHT, INK)
 
     margin = 40
+    content_w = WIDTH - margin * 2
 
     # masthead
     draw_text_centered(rows, WIDTH // 2, 40, "WORLD DAILY", INK, scale=6, spacing=3)
-    hline(rows, margin, 112, WIDTH - margin * 2, INK, 4)
+    hline(rows, margin, 112, content_w, INK, 4)
     draw_text_centered(rows, WIDTH // 2, 126, "SUNDAY, NOVEMBER 22, 2026", RED, scale=4, spacing=3)
-    hline(rows, margin, 184, WIDTH - margin * 2, INK, 4)
+    hline(rows, margin, 184, content_w, INK, 4)
 
     y = 212
 
     # main headline
     draw_tag(rows, margin, y, "SOUTH CHINA SEA", 3)
     y += 56
-    for line in wrap_text("CHINESE BOMBER'S FEINT TOWARD MANILA STOKES MISSILE FEARS",
-                           4, WIDTH - margin * 2):
-        draw_text(rows, margin, y, line, INK, 4)
-        y += GLYPH_H * 4 + 10
+    y = flow_text(rows, margin, y, "CHINESE BOMBER'S FEINT TOWARD MANILA STOKES MISSILE FEARS",
+                  INK, 4, content_w, 10)
     y += 8
-    for line in wrap_text(
-            "H-6 BOMBER CAPABLE OF CARRYING CRUISE MISSILES TURNS BACK 170KM FROM THE CAPITAL NEAR A DISPUTED SHOAL",
-            3, WIDTH - margin * 2):
-        draw_text(rows, margin, y, line, MUTED, 3)
-        y += GLYPH_H * 3 + 8
+    y = flow_text(rows, margin, y,
+                  "H-6 BOMBER CAPABLE OF CARRYING CRUISE MISSILES TURNS BACK 170KM FROM THE CAPITAL NEAR A DISPUTED SHOAL",
+                  MUTED, 3, content_w, 8)
 
     y += 22
-    hline(rows, margin, y, WIDTH - margin * 2, RULE, 2)
+    hline(rows, margin, y, content_w, RULE, 2)
     y += 32
 
-    col_gap = 28
-    col_w = (WIDTH - margin * 2 - col_gap * 2) // 3
-    cols_x = [margin, margin + col_w + col_gap, margin + (col_w + col_gap) * 2]
+    col_w, cols_x = column_positions(margin, WIDTH, 3, 28)
 
     stories = [
         ("AMERICAS", "MEXICO CAPTURES CARTEL BOSS EL CHAPO ISIDRO",
@@ -307,13 +316,13 @@ def build():
         col = i % 3
         if col == 0 and i > 0:
             grid_top = row_bottom + 30
-            hline(rows, margin, grid_top - 15, WIDTH - margin * 2, RULE, 1)
+            hline(rows, margin, grid_top - 15, content_w, RULE, 1)
         yb = story_block(rows, cols_x[col], grid_top, col_w, tag, headline, detail,
                           tag_scale=2, head_scale=2, detail_scale=2, gap=10)
         row_bottom = max(row_bottom, yb)
 
     y = row_bottom + 28
-    hline(rows, margin, y, WIDTH - margin * 2, INK, 4)
+    hline(rows, margin, y, content_w, INK, 4)
     y += 24
 
     draw_tag(rows, margin, y, "ALSO TODAY", 3)
@@ -324,9 +333,7 @@ def build():
         "DENMARK URGES EU-WIDE TRAVEL CURBS ON RUSSIANS AFTER FOILED ASSASSINATION PLOT",
     ]
     for line in ticker_lines:
-        for wrapped in wrap_text(line, 2, WIDTH - margin * 2):
-            draw_text(rows, margin, y, wrapped, INK, 2)
-            y += GLYPH_H * 2 + 12
+        y = flow_text(rows, margin, y, line, INK, 2, content_w, 12)
 
     return rows, y
 
