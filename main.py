@@ -248,6 +248,15 @@ def column_positions(margin, width, count, gap):
     return col_w, [margin + i * (col_w + gap) for i in range(count)]
 
 
+def draw_border(rows, width, height, thickness, color):
+    """A frame around the page: one call in place of the four fill_rects
+    (top, bottom, left, right edge) that used to open build()."""
+    fill_rect(rows, 0, 0, width, thickness, color)
+    fill_rect(rows, 0, height - thickness, width, thickness, color)
+    fill_rect(rows, 0, 0, thickness, height, color)
+    fill_rect(rows, width - thickness, 0, thickness, height, color)
+
+
 def story_block(rows, x, y, w, tag, headline, detail, tag_scale=2, head_scale=3, detail_scale=2,
                 gap=12, headline_line_gap=8, headline_gap=6, detail_line_gap=6):
     """A tagged headline + detail, the shape shared by every story on the page
@@ -262,12 +271,7 @@ def story_block(rows, x, y, w, tag, headline, detail, tag_scale=2, head_scale=3,
 
 def build():
     rows = new_canvas(WIDTH, HEIGHT, PAPER)
-
-    # outer border
-    fill_rect(rows, 0, 0, WIDTH, 10, INK)
-    fill_rect(rows, 0, HEIGHT - 10, WIDTH, 10, INK)
-    fill_rect(rows, 0, 0, 10, HEIGHT, INK)
-    fill_rect(rows, WIDTH - 10, 0, 10, HEIGHT, INK)
+    draw_border(rows, WIDTH, HEIGHT, 10, INK)
 
     margin = 40
     content_w = WIDTH - margin * 2
