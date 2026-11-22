@@ -8,6 +8,11 @@ import struct
 import zlib
 
 # --- PNG encoder (zlib + struct only) ---------------------------------
+# Picks the PNG scanline filter (None/Sub/Up/Average/Paeth) that leaves the
+# smallest residual per row, the heuristic libpng uses by default: a flat
+# front page compresses noticeably tighter filtered this way than with every
+# row forced to filter type 0, and a smaller file wins the rules' byte-count
+# tie-break.
 
 def _chunk(tag, data):
     out = struct.pack(">I", len(data)) + tag + data
@@ -15,14 +20,52 @@ def _chunk(tag, data):
     return out + struct.pack(">I", crc)
 
 
+def _paeth(a, b, c):
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def _residual_score(buf):
+    # treat each byte as a signed delta (0..127 small, 128..255 small-negative)
+    return sum(v if v < 128 else 256 - v for v in buf)
+
+
+def _filter_row(raw, prev, bpp):
+    width = len(raw)
+    sub = bytearray(width)
+    up = bytearray(width)
+    avg = bytearray(width)
+    paeth = bytearray(width)
+    for i in range(width):
+        a = raw[i - bpp] if i >= bpp else 0
+        b = prev[i] if prev is not None else 0
+        c = prev[i - bpp] if (prev is not None and i >= bpp) else 0
+        x = raw[i]
+        sub[i] = (x - a) & 0xFF
+        up[i] = (x - b) & 0xFF
+        avg[i] = (x - ((a + b) >> 1)) & 0xFF
+        paeth[i] = (x - _paeth(a, b, c)) & 0xFF
+    candidates = [(0, raw), (1, sub), (2, up), (3, avg), (4, paeth)]
+    return min(candidates, key=lambda cand: _residual_score(cand[1]))
+
+
 def write_png(path, width, height, rgb_rows):
     """rgb_rows: list of bytearrays, each width*3 bytes of RGB, len == height."""
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    bpp = 3
     raw = bytearray()
+    prev_row = None
     for row in rgb_rows:
-        raw.append(0)  # filter: none
-        raw.extend(row)
+        filter_type, filtered = _filter_row(row, prev_row, bpp)
+        raw.append(filter_type)
+        raw.extend(filtered)
+        prev_row = row
     idat = zlib.compress(bytes(raw), 9)
     with open(path, "wb") as f:
         f.write(sig)
